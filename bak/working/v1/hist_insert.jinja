@@ -1,0 +1,45 @@
+INSERT INTO {{hist_table_catalog}}.{{hist_table_schema}}.{{hist_table_name}} BY NAME
+WITH --Get the data from CTEs
+CTE_SEED AS --Get previous max load date from historical table
+(
+    SELECT '1900-01-01'::TIMESTAMP AS __pstage_synced_timestamp
+    UNION
+    SELECT MAX(__pstage_synced_timestamp) AS __pstage_synced_timestamp
+    FROM {{hist_table_catalog}}.{{hist_table_schema}}.{{hist_table_name}}
+),
+CTE_MAX_LOADED AS
+(
+    SELECT MAX(__pstage_synced_timestamp) AS max__pstage_synced_timestamp
+    FROM CTE_SEED
+),
+CTE_CURRENT AS
+(
+    SELECT
+{% for record in current_to_hist_key_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+{% for record in current_to_hist_attribute_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+        __pstage_deleted_indicator,
+        __pstage_hash_diff,
+		1 as __pstage_active_indicator,
+        __pstage_synced_timestamp AS __pstage_start_timestamp
+    FROM {{current_table_catalog}}.{{current_table_schema}}.{{current_table_name}}
+    INNER JOIN CTE_MAX_LOADED
+    ON loan.__pstage_synced_timestamp > CTE_MAX_LOADED.max__pstage_synced_timestamp -- record if __pstage_synced_timestamp is greater than previous max __pstage_synced_timestamp from historical table
+)
+SELECT
+{% for record in current_to_hist_key_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+{% for record in current_to_hist_attribute_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+    __pstage_deleted_indicator,
+    __pstage_hash_diff,
+	__pstage_active_indicator,
+	__pstage_start_timestamp,
+	'9999-12-31 23:59:59.999999'::TIMESTAMP AS __pstage_end_timestamp,
+	CURRENT_LOCALTIMESTAMP() AS __pstage_synced_timestamp
+FROM CTE_CURRENT;

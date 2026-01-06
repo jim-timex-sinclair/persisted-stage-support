@@ -1,0 +1,38 @@
+MERGE INTO loan AS T
+    USING(
+        SELECT * FROM temp__cte_loan__land
+        WHERE __pstage_load_order = 2
+    ) AS S
+ON S.loan_number = T.loan_number
+    WHEN MATCHED
+        AND S.__pstage_hash_diff <> T.__pstage_hash_diff
+        THEN UPDATE SET 
+        loan_amount = S.loan_amount,
+        loan_officer = S.loan_officer,
+        create_timestamp = S.create_timestamp,
+        update_timestamp = S.update_timestamp,
+        __pstage_synced_timestamp = CURRENT_LOCALTIMESTAMP(), --S.__pstage_synced_timestamp,
+        __pstage_deleted_indicator = false,
+        __pstage_hash_diff = S.__pstage_hash_diff
+    WHEN NOT MATCHED
+        THEN INSERT (
+        loan_number, 
+        loan_amount,
+        loan_officer,
+        create_timestamp,
+        update_timestamp,
+        __pstage_synced_timestamp, 
+        __pstage_deleted_indicator,
+        __pstage_hash_diff
+        )
+        VALUES (
+        S.loan_number, 
+        S.loan_amount,
+        S.loan_officer,
+        S.create_timestamp,
+        S.update_timestamp,
+        CURRENT_LOCALTIMESTAMP(), --S.__pstage_synced_timestamp, 
+        S.__pstage_deleted_indicator,
+        S.__pstage_hash_diff
+        );
+       

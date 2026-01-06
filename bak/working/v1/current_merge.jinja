@@ -1,0 +1,45 @@
+MERGE INTO {{current_table_catalog}}.{{current_table_schema}}.{{current_table_name}} AS T
+    USING(
+        SELECT * FROM temp.main.temp__cte_{{landing_table_name}}  --in DuckDb temp tables are always in the temp.main schema.
+        WHERE __pstage_load_order = {% raw %}{load_order}{% endraw %} --passed in by the batch process
+    ) AS S
+{% for record in land_to_current_key_map_records %}
+{% if loop.first %}
+    ON S.{{ record.target_column_name }} = T.{{record.target_column_name}}
+{% else %}
+    AND S.{{ record.target_column_name }} = T.{{record.target_column_name}}
+{% endif %}
+{% endfor %}
+    WHEN MATCHED
+        AND S.__pstage_hash_diff <> T.__pstage_hash_diff
+        THEN UPDATE SET
+{% for record in land_to_current_attribute_map_records %}
+        {{ record.target_column_name }} = S.{{record.target_column_name}},
+{% endfor %}
+        __pstage_synced_timestamp = CURRENT_LOCALTIMESTAMP(), --S.__pstage_synced_timestamp,
+        __pstage_deleted_indicator = false,
+        __pstage_hash_diff = S.__pstage_hash_diff
+    WHEN NOT MATCHED
+        THEN INSERT (
+{% for record in land_to_current_key_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+{% for record in land_to_current_attribute_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+        __pstage_synced_timestamp, 
+        __pstage_deleted_indicator,
+        __pstage_hash_diff
+        )
+        VALUES (
+{% for record in land_to_current_key_map_records %}
+        S.{{ record.target_column_name }},
+{% endfor %}
+{% for record in land_to_current_attribute_map_records %}
+        S.{{ record.target_column_name }},
+{% endfor %}
+        CURRENT_LOCALTIMESTAMP(), --S.__pstage_synced_timestamp, 
+        S.__pstage_deleted_indicator,
+        S.__pstage_hash_diff
+        );
+       

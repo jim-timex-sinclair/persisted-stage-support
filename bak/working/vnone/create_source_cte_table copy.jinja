@@ -1,0 +1,24 @@
+CREATE or replace TEMP TABLE {{landing_table_catalog}}.{{landing_table_schema}}.temp__cte_{{landing_table_name}}
+AS
+WITH
+CTE_{{landing_table_name}} AS
+(
+	SELECT TRIM(loan_number) AS loan_number, 
+	loan_amount AS loan_amount,
+	TRIM(loan_officer) AS loan_officer,
+	create_timestamp AS create_timestamp, 
+	update_timestamp AS update_timestamp,
+	__pstage_load_dts AS __pstage_load_dts,
+	coalesce(update_timestamp, create_timestamp) AS __pstage_source_change_timestamp,
+	CURRENT_LOCALTIMESTAMP() AS __pstage_synced_timestamp,
+	FALSE AS __pstage_deleted_indicator,
+    md5(
+    	IFNULL(CAST(create_timestamp AS VARCHAR(128)), '')
+    	|| '-' || IFNULL(CAST(loan_amount AS VARCHAR(128)), '')
+    	|| '-' || IFNULL(TRIM(loan_officer), '')
+    	|| '-' || IFNULL(CAST(update_timestamp AS VARCHAR(128)), '')
+    ) AS __pstage_hash_diff,
+    ROW_NUMBER() OVER (PARTITION BY loan_number ORDER BY __pstage_source_change_timestamp DESC, __pstage_load_dts DESC) AS __pstage_load_order
+    FROM {{landing_table_catalog}}.{{landing_table_schema}}.{{landing_table_name}}
+)
+SELECT * FROM CTE_{{landing_table_name}};

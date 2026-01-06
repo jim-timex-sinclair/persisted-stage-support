@@ -1,0 +1,32 @@
+--Note: In duckDb temp tables are created in the temp catalog.
+CREATE or replace TEMP TABLE temp.main.temp__cte_{{landing_table_name}}
+AS
+WITH
+CTE_{{landing_table_name}} AS
+(
+    SELECT
+{% for record in land_to_current_key_map_records %}
+    {{ record.column_sql }} AS {{record.target_column_name}},
+{% endfor %}
+{% for record in land_to_current_attribute_map_records %}
+    {{ record.column_sql }} AS {{record.target_column_name}},
+{% endfor %}
+    __pstage_load_dts AS __pstage_load_dts, --this should be there always
+{% if source_change_timestamp_sql %}
+    coalesce({{source_change_timestamp_sql}}) AS __pstage_source_change_timestamp,
+{% endif %}
+    CURRENT_LOCALTIMESTAMP() AS __pstage_synced_timestamp,
+    FALSE AS __pstage_deleted_indicator,
+    md5(
+{% for record in land_to_current_attribute_map_records %}
+    {% if loop.first %}
+        {{ record.column_md5_sql }}
+    {% else %}
+        || '-' || {{ record.column_md5_sql }}
+    {% endif %}
+{% endfor %}
+    ) AS __pstage_hash_diff,
+    ROW_NUMBER() OVER (PARTITION BY {% for record in land_to_current_key_map_records %}{% if loop.first %}{{record.target_column_name}}{% else %}, {{record.target_column_name}}{% endif %}{% endfor %} ORDER BY {% if source_change_timestamp_sql %}__pstage_source_change_timestamp DESC,{% endif %} __pstage_load_dts DESC) AS __pstage_load_order
+    FROM {{landing_table_catalog}}.{{landing_table_schema}}.{{landing_table_name}}
+)
+SELECT * FROM CTE_{{landing_table_name}};

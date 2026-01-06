@@ -1,0 +1,11 @@
+DELETE FROM {{landing_table_catalog}}.{{landing_table_schema}}.{{landing_table_name}}
+USING temp.main.temp__cte_{{landing_table_name}} --in duck db temp tables are always in the temp.main schema.
+{% for record in land_to_current_key_map_records %}
+    {% if loop.first %}
+WHERE ({{landing_table_catalog}}.{{landing_table_schema}}.{{landing_table_name}}.{{ record.target_column_name }} = temp.main.temp__cte_{{landing_table_name}}.{{ record.target_column_name }}
+    {% else %}
+AND {{landing_table_catalog}}.{{landing_table_schema}}.{{landing_table_name}}.{{ record.target_column_name }} = temp.main.temp__cte_{{landing_table_name}}.{{ record.target_column_name }}
+    {% endif %}
+{% endfor %}
+AND {{landing_table_catalog}}.{{landing_table_schema}}.{{landing_table_name}}.__pstage_inserted_timestamp = temp.main.temp__cte_{{landing_table_name}}.__pstage_inserted_timestamp
+);

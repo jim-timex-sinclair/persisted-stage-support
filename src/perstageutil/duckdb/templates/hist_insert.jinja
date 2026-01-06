@@ -1,0 +1,60 @@
+INSERT INTO {{hist_table_catalog}}.{{hist_table_schema}}.{{hist_table_name}} BY NAME
+WITH --Get the data from CTEs
+CTE_SEED AS --Get previous max load date from historical table
+(
+    SELECT '1900-01-01'::TIMESTAMP AS __pstage_inserted_timestamp
+    UNION
+    SELECT MAX(__pstage_inserted_timestamp) AS __pstage_inserted_timestamp
+    FROM {{hist_table_catalog}}.{{hist_table_schema}}.{{hist_table_name}}
+),
+CTE_MAX_LOADED AS
+(
+    SELECT MAX(__pstage_inserted_timestamp) AS max__pstage_inserted_timestamp
+    FROM CTE_SEED
+),
+CTE_CURRENT AS
+(
+    SELECT
+{% for record in current_to_hist_key_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+{% for record in current_to_hist_attribute_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+        __pstage_deleted_indicator,
+        __pstage_hash_diff,
+		1 as __pstage_current_version_indicator,
+        __pstage_inserted_timestamp AS __pstage_effective_timestamp
+    FROM {{current_table_catalog}}.{{current_table_schema}}.{{current_table_name}}
+    INNER JOIN CTE_MAX_LOADED
+    ON loan.__pstage_inserted_timestamp > CTE_MAX_LOADED.max__pstage_inserted_timestamp -- record if __pstage_inserted_timestamp is greater than previous max __pstage_inserted_timestamp from historical table
+    UNION
+    SELECT
+{% for record in current_to_hist_key_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+{% for record in current_to_hist_attribute_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+        __pstage_deleted_indicator,
+        __pstage_hash_diff,
+		1 as __pstage_current_version_indicator,
+        __pstage_updated_timestamp AS __pstage_effective_timestamp
+    FROM {{current_table_catalog}}.{{current_table_schema}}.{{current_table_name}}
+    INNER JOIN CTE_MAX_LOADED
+    ON loan.__pstage_updated_timestamp > CTE_MAX_LOADED.max__pstage_inserted_timestamp -- record if __pstage_updated_timestamp is greater than previous max __pstage_inserted_timestamp from historical table
+)
+SELECT
+{% for record in current_to_hist_key_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+{% for record in current_to_hist_attribute_map_records %}
+        {{ record.target_column_name }},
+{% endfor %}
+    __pstage_deleted_indicator,
+    __pstage_hash_diff,
+	__pstage_current_version_indicator,
+	__pstage_effective_timestamp,
+	'9999-12-31 23:59:59.999999'::TIMESTAMP AS __pstage_expiration_timestamp,
+	CURRENT_LOCALTIMESTAMP() AS __pstage_inserted_timestamp
+FROM CTE_CURRENT;

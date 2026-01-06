@@ -1,0 +1,43 @@
+UPDATE loan__hist
+SET __pstage_end_timestamp = SUB_HIST_UP.__pstage_end_timestamp,
+__pstage_synced_timestamp = SUB_HIST_UP.__pstage_synced_timestamp,
+__pstage_active_indicator = SUB_HIST_UP.__pstage_active_indicator
+FROM
+(
+    WITH
+    CTE_UPDATE_NEEDED AS
+    (
+        SELECT loan_number, COUNT(*) AS record_count
+        FROM loan__hist
+        WHERE __pstage_active_indicator = true
+        GROUP BY loan_number
+        HAVING COUNT(*) > 1
+    ),
+    CTE_HIST_UP_1 AS
+    (
+        SELECT TARGET.loan_number, TARGET.__pstage_start_timestamp,
+        LAST_VALUE(TARGET.__pstage_start_timestamp) OVER (PARTITION BY TARGET.loan_number ORDER BY TARGET.__pstage_start_timestamp ROWS BETWEEN 0 PRECEDING AND 1 FOLLOWING) AS __pstage_end_timestamp
+        FROM loan__hist TARGET
+        INNER JOIN CTE_UPDATE_NEEDED
+        ON TARGET.loan_number = CTE_UPDATE_NEEDED.loan_number
+        WHERE TARGET.__pstage_active_indicator = 1
+    ),
+    CTE_HIST_UP_2 AS
+    (
+        SELECT loan_number, __pstage_start_timestamp,
+        CASE
+            WHEN __pstage_start_timestamp = __pstage_end_timestamp THEN '9999-12-31 23:59:59.999999'::TIMESTAMP
+            ELSE __pstage_end_timestamp
+        END AS __pstage_end_timestamp,
+        CASE
+            WHEN __pstage_start_timestamp = __pstage_end_timestamp THEN 1
+            ELSE 0
+        END __pstage_active_indicator
+        FROM CTE_HIST_UP_1
+    )
+    SELECT loan_number, __pstage_start_timestamp, __pstage_end_timestamp, CURRENT_LOCALTIMESTAMP() AS __pstage_synced_timestamp, __pstage_active_indicator
+    FROM CTE_HIST_UP_2
+    ORDER BY __pstage_start_timestamp
+) SUB_HIST_UP
+WHERE loan__hist.loan_number = SUB_HIST_UP.loan_number
+AND loan__hist.__pstage_start_timestamp = SUB_HIST_UP.__pstage_start_timestamp;

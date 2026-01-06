@@ -1,0 +1,97 @@
+UPDATE {{hist_table_catalog}}.{{hist_table_schema}}.{{hist_table_name}}
+SET __pstage_expiration_timestamp = SUB_HIST_UP.__pstage_expiration_timestamp,
+__pstage_updated_timestamp = SUB_HIST_UP.__pstage_updated_timestamp,
+__pstage_current_version_indicator = SUB_HIST_UP.__pstage_current_version_indicator
+FROM
+(
+    WITH
+    CTE_UPDATE_NEEDED AS
+    (
+{% for record in current_to_hist_key_map_records %}
+    {% if loop.first %}
+        SELECT {{ record.target_column_name }},
+    {% else %}
+        {{ record.target_column_name }},
+    {% endif %}
+{% endfor %}
+        COUNT(*) AS record_count
+        FROM {{hist_table_catalog}}.{{hist_table_schema}}.{{hist_table_name}}
+        WHERE __pstage_current_version_indicator = true
+{% for record in current_to_hist_key_map_records %}
+    {% if loop.first and loop.last %}
+        GROUP BY {{ record.target_column_name }}
+    {% elif loop.first %}
+        GROUP BY {{ record.target_column_name }},
+    {% elif loop.last %}
+        {{ record.target_column_name }}
+    {% else %}
+        {{ record.target_column_name }},
+    {% endif %}
+{% endfor %}
+        HAVING COUNT(*) > 1
+    ),
+    CTE_HIST_UP_1 AS
+    (
+{% for record in current_to_hist_key_map_records %}
+    {% if loop.first %}
+        SELECT TARGET.{{ record.target_column_name }},
+    {% else %}
+        TARGET.{{ record.target_column_name }},
+    {% endif %}
+{% endfor %}
+        TARGET.__pstage_effective_timestamp,
+        LAST_VALUE(TARGET.__pstage_effective_timestamp) OVER ({% for record in current_to_hist_key_map_records %}{% if loop.first and loop.last %}PARTITION BY TARGET.{{ record.target_column_name }}{% elif loop.first %}PARTITION BY TARGET.{{ record.target_column_name }},{% elif loop.last %} TARGET.{{ record.target_column_name }}{% else %} TARGET.{{ record.target_column_name }},{% endif %}{% endfor %}   
+        ORDER BY TARGET.__pstage_effective_timestamp ROWS BETWEEN 0 PRECEDING AND 1 FOLLOWING) AS __pstage_expiration_timestamp
+        FROM {{hist_table_catalog}}.{{hist_table_schema}}.{{hist_table_name}} TARGET
+        INNER JOIN CTE_UPDATE_NEEDED
+{% for record in current_to_hist_key_map_records %}
+    {% if loop.first %}
+        ON TARGET.{{ record.target_column_name }} = CTE_UPDATE_NEEDED.{{ record.target_column_name }}
+    {% else %}
+        AND TARGET.{{ record.target_column_name }} = CTE_UPDATE_NEEDED.{{ record.target_column_name }}
+    {% endif %}
+{% endfor %}
+        WHERE TARGET.__pstage_current_version_indicator = 1
+    ),
+    CTE_HIST_UP_2 AS
+    (
+{% for record in current_to_hist_key_map_records %}
+    {% if loop.first %}
+        SELECT {{ record.target_column_name }},
+    {% else %}
+        {{ record.target_column_name }},
+    {% endif %}
+{% endfor %}
+        __pstage_effective_timestamp,
+        CASE
+            WHEN __pstage_effective_timestamp = __pstage_expiration_timestamp THEN '9999-12-31 23:59:59.999999'::TIMESTAMP
+            ELSE __pstage_expiration_timestamp
+        END AS __pstage_expiration_timestamp,
+        CASE
+            WHEN __pstage_effective_timestamp = __pstage_expiration_timestamp THEN 1
+            ELSE 0
+        END __pstage_current_version_indicator
+        FROM CTE_HIST_UP_1
+    )
+{% for record in current_to_hist_key_map_records %}
+    {% if loop.first %}
+    SELECT {{ record.target_column_name }},
+    {% else %}
+    {{ record.target_column_name }},
+    {% endif %}
+{% endfor %}
+    __pstage_effective_timestamp,
+    __pstage_expiration_timestamp,
+    CURRENT_LOCALTIMESTAMP() AS __pstage_updated_timestamp,
+    __pstage_current_version_indicator
+    FROM CTE_HIST_UP_2
+    ORDER BY __pstage_effective_timestamp
+) SUB_HIST_UP
+{% for record in current_to_hist_key_map_records %}
+    {% if loop.first %}
+WHERE {{hist_table_catalog}}.{{hist_table_schema}}.{{hist_table_name}}.{{ record.target_column_name }} = SUB_HIST_UP.{{ record.target_column_name }}
+    {% else %}
+AND {{hist_table_catalog}}.{{hist_table_schema}}.{{hist_table_name}}.{{ record.target_column_name }} = SUB_HIST_UP.{{ record.target_column_name }}
+    {% endif %}
+{% endfor %}
+AND {{hist_table_catalog}}.{{hist_table_schema}}.{{hist_table_name}}.__pstage_effective_timestamp = SUB_HIST_UP.__pstage_effective_timestamp;

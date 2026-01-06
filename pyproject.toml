@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools >= 77.0.3", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "perstageutil"
+version = "0.0.1"
+authors = [
+  { name="James P Moran III", email="jamespmoraniii@gmail.com" },
+]
+description = "A small example package"
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+dependencies = [
+  "jinja2",
+  "duckdb",
+  "pandas",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["perstageutil.duckdb*"]
+
+#this may skip the need for the manifest.in file
+# and this can be skipped...
+# [tool.setuptools]
+# include-package-data = true
+#and this is set...
+[tool.setuptools.package-data]
+"perstageutil.duckdb" = ["*.jinja", "templates/*.jinja"]
+
+
+
+[project.urls]
+Homepage = "https://github.com/pypa/sampleprsoject"
+Issues = "https://github.com/pypa/sampleproject/issues"

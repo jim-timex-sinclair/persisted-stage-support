@@ -1,0 +1,5 @@
+DELETE FROM loan__land
+USING temp__cte_loan__land
+WHERE (loan__land.loan_number = temp__cte_loan__land.loan_number
+AND loan__land.__pstage_load_dts = temp__cte_loan__land.__pstage_load_dts
+);
