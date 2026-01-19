@@ -5,13 +5,13 @@ truncate table loan__hist;
 
 
 --CREATE TEMP table
---CREATE or replace TEMP TABLE temp__cte_loan__land
---AS
+CREATE or replace TEMP TABLE temp__cte_loan__land
+AS
 WITH
 CTE_REMOVE_PERFECT_DUPES AS
 (
 	SELECT DISTINCT *
-	FROM test_persisted_stage.main.loan__land
+	FROM test_persisted_stage_work.main.loan__land
 ),
 CTE_MAIN AS
 (
@@ -20,7 +20,7 @@ CTE_MAIN AS
 	TRIM(loan_officer) AS loan_officer,
 	create_timestamp AS create_timestamp, 
 	update_timestamp AS update_timestamp,
-	__pstage_inserted_timestamp,
+	__pstage_load_timestamp,
 	coalesce(update_timestamp, create_timestamp) AS __pstage_source_change_timestamp,
 	FALSE AS __pstage_deleted_indicator,
     md5(
@@ -29,20 +29,85 @@ CTE_MAIN AS
     	|| '-' || IFNULL(TRIM(loan_officer), '')
     	|| '-' || IFNULL(CAST(update_timestamp AS VARCHAR(128)), '')
     ) AS __pstage_hash_diff,
-    ROW_NUMBER() OVER (PARTITION BY loan_number ORDER BY __pstage_source_change_timestamp DESC, __pstage_inserted_timestamp DESC) AS __pstage_load_order
+    ROW_NUMBER() OVER (PARTITION BY loan_number ORDER BY __pstage_source_change_timestamp DESC, __pstage_load_timestamp DESC) AS __pstage_load_order
     FROM CTE_REMOVE_PERFECT_DUPES
 ),
 CTE_CALC_CONFIDENCE AS
 (
-	SELECT loan_number, __pstage_source_change_timestamp, __pstage_inserted_timestamp, (1/COUNT(*)) * 100 AS __pstage_dedupe_confidence_percent
+	SELECT loan_number, __pstage_source_change_timestamp, __pstage_load_timestamp, (1/COUNT(*)) * 100 AS __pstage_dedupe_confidence_percent
 	FROM CTE_MAIN
-	GROUP BY loan_number, __pstage_inserted_timestamp, __pstage_source_change_timestamp
+	GROUP BY loan_number, __pstage_source_change_timestamp, __pstage_load_timestamp, 
 )
-SELECT main.*, ccon.__pstage_dedupe_confidence_percent FROM CTE_MAIN main
+SELECT main.*, ccon.__pstage_dedupe_confidence_percent 
+FROM CTE_MAIN main
 LEFT JOIN CTE_CALC_CONFIDENCE ccon
 ON main.loan_number = ccon.loan_number
 AND main.__pstage_source_change_timestamp = ccon.__pstage_source_change_timestamp
-AND main.__pstage_inserted_timestamp = ccon.__pstage_inserted_timestamp;
+AND main.__pstage_load_timestamp = ccon.__pstage_load_timestamp;
+
+--load persisted stage table
+INSERT INTO loan BY NAME
+WITH
+CTE_CURRENT_KEYS AS
+(
+	SELECT DISTINCT loan_number
+	FROM temp__cte_loan__land
+),
+CTE_CURRENT_TARGET AS
+(
+	SELECT T.loan_number, T.__pstage_hash_diff, T.__pstage_load_timestamp,
+	ROW_NUMBER() OVER (PARTITION BY T.loan_number ORDER BY T.__pstage_load_timestamp DESC) AS __pstage_order
+	FROM Loan T
+	INNER JOIN CTE_CURRENT_KEYS CK
+	ON T.loan_number = CK.loan_number
+),
+CTE_CURRENT AS
+(
+    SELECT
+        loan_number, loan_amount, loan_officer, create_timestamp, update_timestamp, FALSE AS __pstage_deleted_indicator, __pstage_hash_diff,
+        CURRENT_LOCALTIMESTAMP() AS __pstage_load_timestamp, __pstage_dedupe_confidence_percent
+    FROM temp__cte_loan__land
+    WHERE __pstage_load_order = 2 --the batch number...
+    AND NOT EXISTS
+    (FROM CTE_CURRENT_TARGET WHERE temp__cte_loan__land.loan_number = CTE_CURRENT_TARGET.loan_number
+    AND temp__cte_loan__land.__pstage_hash_diff = CTE_CURRENT_TARGET.__pstage_hash_diff
+    AND CTE_CURRENT_TARGET.__pstage_order = 1
+    )
+)
+SELECT * FROM CTE_CURRENT;
+
+INSERT INTO loan BY NAME
+WITH
+CTE_CURRENT_KEYS AS
+(
+	SELECT DISTINCT loan_number
+	FROM temp__cte_loan__land
+),
+CTE_CURRENT_TARGET AS
+(
+	SELECT T.loan_number, T.__pstage_hash_diff, T.__pstage_load_timestamp,
+	ROW_NUMBER() OVER (PARTITION BY T.loan_number ORDER BY T.__pstage_load_timestamp DESC) AS __pstage_order
+	FROM Loan T
+	INNER JOIN CTE_CURRENT_KEYS CK
+	ON T.loan_number = CK.loan_number
+),
+CTE_CURRENT AS
+(
+    SELECT
+        loan_number, loan_amount, loan_officer, create_timestamp, update_timestamp, FALSE AS __pstage_deleted_indicator, __pstage_hash_diff,
+        CURRENT_LOCALTIMESTAMP() AS __pstage_load_timestamp, __pstage_dedupe_confidence_percent
+    FROM temp__cte_loan__land
+    WHERE __pstage_load_order = 1 --the batch number
+    AND NOT EXISTS
+    (FROM CTE_CURRENT_TARGET WHERE temp__cte_loan__land.loan_number = CTE_CURRENT_TARGET.loan_number
+    AND temp__cte_loan__land.__pstage_hash_diff = CTE_CURRENT_TARGET.__pstage_hash_diff
+    AND CTE_CURRENT_TARGET.__pstage_order = 1
+    )
+)
+SELECT * FROM CTE_CURRENT;
+
+SELECT * FROM loan order by loan_number, __pstage_load_timestamp desc;
+
 
 SELECT DISTINCT __pstage_load_order AS __pstage_load_order
 FROM temp__cte_loan__land
@@ -301,5 +366,4 @@ AND loan__land.__pstage_load_dts = temp__cte_loan__land.__pstage_load_dts
 DROP TABLE temp__cte_loan__land;
 
 select * from 
-test_persisted_stage.main.loan__hist
-order by loan_number, __pstage_effective_timestamp desc;
+test_persisted_stage.main.loan__hist;

@@ -2,7 +2,7 @@
 # Duckdb persisted staging load program
 #
 
-import jinja2
+#import jinja2
 import pandas
 
 # need the below to be able to run this and pick up the local lib if testing this by itself.
@@ -37,6 +37,9 @@ def exec(session : Session, landing_table_full_name : str, current_table_full_na
     :param hist_table_full_name: The historical table to to be inserted into, which is a persisted table that tracks all changes.   The table needs to have the needed metadata columns and the 
     load will error if they are not there.
     :type hist_table_full_name: str
+    :param source_change_timestamp_columns: These are columns in the source that indicate a time sequence that should be respected in the the data warehouse load.  These columns will be used in addition 
+    to the __pstage_inserted_timestamp to organized the loads and they will be given a higher priority.
+    :type source_change_timestamp_columns: list
     """
     session.logger.info(f"Starting load for namespace {current_table_full_name}.")
     landing_table_object = _common.split_three_part_name(landing_table_full_name)

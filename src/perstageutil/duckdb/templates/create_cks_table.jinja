@@ -1,0 +1,6 @@
+CREATE or replace TABLE {{table_catalog}}.{{table_schema}}.{{table_name}}(
+{% for record in key_records %}
+{{ record.column_name }} {{record.data_type_sql}} not null,
+{% endfor %}
+__pstage_inserted_timestamp TIMESTAMP not null,
+PRIMARY KEY({% for record in key_records %}{% if loop.last %}{{ record.column_name }}{% else %}{{ record.column_name }},{% endif %}{% endfor %}));

@@ -101,7 +101,8 @@ def check_hist_table_structure(session : Session, hist_table_object : DataObject
 def return_columns_df(session : Session, table_object : DataObject) -> pandas.DataFrame:
     """This function is an implementation detail and should not be used externally."""
     sql = f"""
-    SELECT c.table_catalog, c.table_schema, c.table_name, c.column_name, c.ordinal_position, c.data_type,
+    SELECT c.table_catalog, c.table_schema, c.table_name, c.column_name, c.ordinal_position, c.is_nullable, c.data_type,
+    c.character_maximum_length, c.numeric_precision, c.numeric_scale, c.datetime_precision,
     CASE
         WHEN kcu.constraint_name IS NULL THEN FALSE
         ELSE TRUE
@@ -212,6 +213,29 @@ def exec_sql_return(session : Session, sql : str):
         session.logger.error(err)
         raise err
     return results
+
+def exec_ddl(session : Session, sql : str):
+    """
+    This function is an implementation detail and should not be used externally.
+    Executes data manipulation language statements in DuckDb and captures and logs the Updated rows output.
+    
+    :param session: Description
+    :type session: Session
+    :param sql: Description
+    :type sql: str
+    """
+    try:
+        session.logger.debug(f"SQL: {sql}")
+        session.logger.info(f"Partial output of query being executed (first 256 characters):\n{sql[:256]}\n...")
+        #session.conn.sql(sql)
+        results = session.conn.execute(sql).fetchall()
+        for result in results:
+            # updated_rows, = result
+            # updated_rows = str(updated_rows)
+            session.logger.info(f"Result: {result}.")
+    except Exception as err:
+        session.logger.error(err)
+        raise err
 
 def convert_df_to_records(df : pandas.DataFrame):
     """
