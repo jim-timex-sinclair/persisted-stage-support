@@ -6,7 +6,7 @@ Persisted Load Utilities are a number of different programs that use the interna
 
 ## Acknowledgments
 
-The author would like to acknowledge the direct contributions of the following people during the initial development of this method while working at Homepoint Financial.
+The author would like to acknowledge the direct contributions of the following people during the initial development of this method while the group of us were working at Homepoint Financial.
 
 James Newsom
 
@@ -17,6 +17,8 @@ Tom Reddy
 Avtar Singh
 
 Saurabh Malhotra
+
+Note that all the code here has been developed on my own time from December 2025 to January 2026 while on a break between roles.  But the above folks all contributed ideas which I documented for myself and remembered.
 
 As well the ideas from the following authors were contributed.
 
