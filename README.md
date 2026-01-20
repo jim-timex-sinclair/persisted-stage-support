@@ -4,11 +4,14 @@ This documentation is incomplete (and a bit of a mess) but I'm working on it...
 
 Persisted Load Utilities are a number of different programs that use the internal metadata of the RDBMS to upsert data into a persisted staging area.  Rather than code lots of merge and insert processes, one can simply call the functions in this package to load data into tables in a persisted staging area. The project is starting with DuckDB as that is an "open-source, embedded, analytical SQL database management system (DBMS) designed for fast analytical queries on local data" and free and easy to test on.  Future packages are contemplated in other RDBMS such as Databricks and Snowflake.
 
+Note that all the code here has been developed on my own time from December 2025 to January 2026 while on a break between roles.  But the below folks all contributed ideas which I documented for myself and remembered.
+
+
 ## Acknowledgments
 
-The author would like to acknowledge the direct contributions of the following people during the initial development of this method while the group of us were working at Homepoint Financial.
+The following folks contributed to a governed data lake concept which was foundational in the development of this code and the associated documentation.
 
-James Newsom
+James Newsom Jr.
 
 Keith Barefoot
 
@@ -18,9 +21,7 @@ Avtar Singh
 
 Saurabh Malhotra
 
-Note that all the code here has been developed on my own time from December 2025 to January 2026 while on a break between roles.  But the above folks all contributed ideas which I documented for myself and remembered.
-
-As well the ideas from the following authors were contributed.
+As well the ideas from the following authors were instrumental.
 
 Roelant Voss for his writings regarding persisted staging in general.
 
@@ -208,21 +209,21 @@ You deactive it by running .\Scripts\deactivate.bat.
 You can copy the install gzip from our share.
 
 ```{cmd}
-copy x-1.0.0.0.tar.gz C:\Users\<YOUR AD NAME>\pyenvironments\test_environment\x-1.0.0.0.tar.gz
+copy perstageutil-0.0.1.tar.gz C:\Users\<YOUR AD NAME>\pyenvironments\test_environment\perstageutil-0.0.1.tar.gz
 ```
 
 You can then simply install it with pip.
 
 ```{cmd}
-pip install x-1.0.0.0.tar.gz
+pip install perstageutil-0.0.1.tar.gz
 ```
 
 1. Unistall Process
 
-To uninstall the autodade software.
+To uninstall the persstageutil software.
 
 ```{cmd}
-pip uninstall hpfc_getinfa
+pip uninstall herstageutil-0.0.1.tar.gz
 ```
 
 To clean up your entire virtual environment you can run the following commands which will remove all installed modules.
@@ -300,5 +301,10 @@ The dependencies should be taken care of by the installer.
 
 # Build and Test
 
-## TO BUILD INSTALL ON YOUR COMPUTER
+To build the project, in a command line tool (cmd in windows), cd to the top directory in your local repo and type the following:
+
+```
+python -m build
+```
+
 
