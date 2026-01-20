@@ -9,17 +9,17 @@ Note that all the code here has been developed on my own time from December 2025
 
 ## Acknowledgments
 
-The following folks contributed to a governed data lake concept which was foundational in the development of this code and the associated documentation.
+The following folks contributed to a governed data lake concept which was foundational in the development of this code and the associated documentation.  For privacy reasons just just the first names are published, but they know who they are.
 
-James Newsom Jr.
+James N.
 
-Keith Barefoot
+Keith B.
 
-Tom Reddy
+Tom R.
 
-Avtar Singh
+Avtar S.
 
-Saurabh Malhotra
+Saurabh M.
 
 As well the ideas from the following authors were instrumental.
 
