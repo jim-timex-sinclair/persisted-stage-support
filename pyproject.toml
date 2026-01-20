@@ -8,7 +8,7 @@ version = "0.0.1"
 authors = [
   { name="James P Moran III", email="jamespmoraniii@gmail.com" },
 ]
-description = "A small example package"
+description = "Persisted Load Utilities"
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [
@@ -21,6 +21,7 @@ dependencies = [
   "jinja2",
   "duckdb",
   "pandas",
+  "logger",
 ]
 
 [tool.setuptools.packages.find]
@@ -38,5 +39,5 @@ include = ["perstageutil.duckdb*"]
 
 
 [project.urls]
-Homepage = "https://github.com/pypa/sampleprsoject"
-Issues = "https://github.com/pypa/sampleproject/issues"
+Homepage = "https://github.com/Jimtimesinc/persisted-stage-support"
+Issues = "https://github.com/Jimtimesinc/persisted-stage-support/issues"
